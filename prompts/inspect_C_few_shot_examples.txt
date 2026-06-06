@@ -1,0 +1,76 @@
+EJEMPLO 1 — Estante con problemas graves:
+Descripción de la imagen: Estante de bebidas. Nivel inferior completamente vacío.
+Nivel medio con botellas caídas en el lado derecho.
+JSON producido:
+{
+  "inspection_id": "INS_20250301_100000_001",
+  "timestamp": "2025-03-01T10:00:00Z",
+  "image_path": "example1.jpg",
+  "zone_id": "Z_S1",
+  "overall_status": "critical",
+  "issues": [
+    {
+      "issue_id": "ISS_001",
+      "type": "empty_shelf",
+      "location": "nivel inferior, toda la sección",
+      "severity": "high",
+      "description": "El nivel inferior del estante está completamente vacío, sin productos.",
+      "confidence": 0.97,
+      "affected_area_pct": 33.0
+    },
+    {
+      "issue_id": "ISS_002",
+      "type": "misaligned",
+      "location": "nivel medio, lado derecho",
+      "severity": "medium",
+      "description": "Varias botellas caídas en la sección derecha del nivel medio.",
+      "confidence": 0.88,
+      "affected_area_pct": 15.0
+    }
+  ],
+  "shelf_fill_rate": 52.0,
+  "products_detected": ["bebidas", "refrescos", "botellas de plástico"],
+  "model_reasoning": "El nivel inferior no tiene ningún producto visible. El nivel medio muestra desorden en la zona derecha con botellas tumbadas. El nivel superior parece completo. Fill rate estimado: ~52%."
+}
+
+EJEMPLO 2 — Estante en buen estado:
+Descripción de la imagen: Estante de conservas. Todos los niveles bien llenos.
+Productos bien alineados. Sin huecos visibles.
+JSON producido:
+{
+  "inspection_id": "INS_20250302_120000_001",
+  "timestamp": "2025-03-02T12:00:00Z",
+  "image_path": "example2.jpg",
+  "zone_id": "Z_S2",
+  "overall_status": "ok",
+  "issues": [],
+  "shelf_fill_rate": 94.0,
+  "products_detected": ["conservas", "latas", "botes de cristal"],
+  "model_reasoning": "Todos los niveles están bien surtidos. Los productos están alineados frontalmente. No se observan huecos ni productos dañados. Fill rate estimado: ~94%."
+}
+
+EJEMPLO 3 — Violación de planograma:
+Descripción de la imagen: Estante de lácteos. Zona central tiene productos de limpieza
+mezclados con yogures.
+JSON producido:
+{
+  "inspection_id": "INS_20250303_090000_001",
+  "timestamp": "2025-03-03T09:00:00Z",
+  "image_path": "example3.jpg",
+  "zone_id": "Z_S3",
+  "overall_status": "warning",
+  "issues": [
+    {
+      "issue_id": "ISS_001",
+      "type": "wrong_product",
+      "location": "nivel medio, sección central",
+      "severity": "medium",
+      "description": "Productos de limpieza colocados entre los yogures, violando el planograma de la sección de lácteos.",
+      "confidence": 0.91,
+      "affected_area_pct": 20.0
+    }
+  ],
+  "shelf_fill_rate": 80.0,
+  "products_detected": ["lácteos", "yogures", "productos de limpieza"],
+  "model_reasoning": "El estante tiene buen nivel de llenado general. Sin embargo, en el nivel medio centro se observan productos de limpieza que no corresponden a la sección de lácteos. Esto es una violación de planograma."
+}

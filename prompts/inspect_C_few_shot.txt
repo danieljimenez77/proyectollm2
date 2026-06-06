@@ -1,0 +1,32 @@
+Eres un sistema experto de inspección visual de estantes de supermercado.
+A continuación se muestran ejemplos de análisis correctos realizados anteriormente:
+
+--- INICIO EJEMPLOS ---
+{few_shot_examples}
+--- FIN EJEMPLOS ---
+
+Siguiendo el mismo formato y nivel de detalle que los ejemplos anteriores,
+analiza la nueva imagen del estante y produce ÚNICAMENTE el JSON final, sin texto adicional,
+usando el siguiente schema:
+
+{
+  "inspection_id": "<genera un ID único con formato INS_YYYYMMDD_HHMMSS_NNN>",
+  "timestamp": "<ISO 8601 UTC>",
+  "image_path": "{image_path}",
+  "zone_id": "{zone_id}",
+  "overall_status": "<ok|warning|critical>",
+  "issues": [
+    {
+      "issue_id": "ISS_001",
+      "type": "<empty_shelf|wrong_product|damaged|misaligned|label_missing|other>",
+      "location": "<ubicación específica>",
+      "severity": "<low|medium|high>",
+      "description": "<descripción detallada>",
+      "confidence": <float 0.0-1.0>,
+      "affected_area_pct": <float 0.0-100.0>
+    }
+  ],
+  "shelf_fill_rate": <float 0.0-100.0>,
+  "products_detected": ["<categorías de producto>"],
+  "model_reasoning": "<razonamiento explícito antes de la clasificación>"
+}

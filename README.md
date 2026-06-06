@@ -1,0 +1,342 @@
+# Retail Vision Intelligence System — TP2
+
+**LIACD — Interação com Modelos de Grande Escala**  
+Año lectivo 2025/2026
+
+---
+
+## Índice
+
+1. [Descripción del proyecto](#descripción-del-proyecto)
+2. [Estructura del repositorio](#estructura-del-repositorio)
+3. [Dataset](#dataset)
+4. [Instalación y configuración](#instalación-y-configuración)
+5. [Componentes](#componentes)
+6. [Uso](#uso)
+7. [Evaluación](#evaluación)
+8. [Decisiones técnicas y problemas encontrados](#decisiones-técnicas-y-problemas-encontrados)
+
+---
+
+## Descripción del proyecto
+
+Sistema de inspección visual continua de estantes de supermercado con memoria. El sistema recibe imágenes de estantes, las analiza con modelos de lenguaje multimodales (Google Gemini), detecta problemas operacionales, permite definir reglas de detección en lenguaje natural, e indexa el historial de inspecciones en una base de datos vectorial para recuperación semántica.
+
+### Componentes principales
+
+| Componente | Archivo | Descripción |
+|---|---|---|
+| 1 | `src/shelf_inspector.py` | Análisis visual con LLM multimodal |
+| 2 | `src/rule_engine.py` | Generación y ejecución de reglas en lenguaje natural |
+| 3 | `src/rag_memory.py` | Indexación y recuperación de inspecciones históricas |
+| 4 | `src/report_generator.py` | Generación de informes con contexto histórico |
+| 5 | `src/interface.py` | Interfaz conversacional para el gestor de tienda |
+
+---
+
+## Estructura del repositorio
+
+```
+tp2 integracion/
+├── README.md
+├── requirements.txt
+├── Apikey.txt
+├── .gitignore
+│
+├── data/
+│   ├── images/                       ← Dataset de imágenes
+│   │   ├── normal/                   ← 150 imágenes de estantes normales
+│   │   ├── empty/                    ← 100 imágenes de estantes vacíos
+│   │   ├── planogram/                ← 100 imágenes de violaciones de planograma
+│   │   ├── dirty/                    ← 80 imágenes de estantes sucios/desordenados
+│   │   └── ambiguous/                ← 70 imágenes de casos ambiguos
+│   ├── inspections/                  ← Inspection records generados
+│   └── rules/                        ← Reglas persistidas
+│
+├── src/
+│   ├── shelf_inspector.py
+│   ├── rule_engine.py
+│   ├── rag_memory.py
+│   ├── report_generator.py
+│   └── interface.py
+│
+├── prompts/
+│   ├── inspect_A_zero_shot.txt
+│   ├── inspect_B_chain_of_thought.txt
+│   ├── inspect_C_few_shot.txt
+│   └── inspect_C_few_shot_examples.txt
+│
+├── vectorstore/                      ← ChromaDB persistente (generado en runtime)
+├── cache/                            ← Cache de resultados de API (generado en runtime)
+└── evaluate.py
+```
+
+---
+
+## Dataset
+
+### Fuentes utilizadas
+
+El dataset combina dos fuentes principales:
+
+**1. SKU-110K** (Goldman et al., 2019)
+- 11.762 imágenes de supermercado con anotaciones de bounding box
+- Fuente principal para imágenes de estantes normales y con productos bien posicionados
+- Repositorio: https://github.com/eg4000/SKU110K_CVPR19
+- Licencia: uso académico
+
+**2. Grocery Store Dataset** (Hult et al., 2019)
+- Imágenes de productos y estantes en condiciones naturales
+- Complementa el SKU-110K en categorías de violaciones de planograma y desorden
+- HuggingFace: `johnanvik/grocery-store-dataset`
+- Licencia: uso académico
+
+### Distribución mínima requerida
+
+| Tipo | Mínimo | Descripción |
+|---|---|---|
+| Estante normal | 150 | Producto bien posicionado, sin problemas visibles |
+| Estante vacío | 100 | Una o más posiciones sin producto |
+| Violación de planograma | 100 | Producto en posición incorrecta, etiqueta ausente, producto caído |
+| Estante sucio/desordenado | 80 | Producto desalineado, embalajes dañados |
+| Caso ambiguo | 70 | Situaciones donde la clasificación no es obvia |
+
+### Justificación de la elección
+
+Se eligió SKU-110K como fuente principal por ser el dataset de referencia en investigación de retail, con anotaciones de alta calidad y suficiente volumen. El Grocery Store Dataset complementa las categorías con menor representación en SKU-110K. Esta combinación permite cubrir todos los tipos de imagen requeridos con diversidad suficiente para generalización.
+
+---
+
+## Instalación y configuración
+
+### Requisitos previos
+
+- Python 3.11 o superior
+- Cuenta en [Google AI Studio](https://aistudio.google.com) (gratuita, sin tarjeta de crédito)
+
+### 1. Instalar dependencias
+
+```bash
+pip install -r requirements.txt
+```
+
+Contenido de `requirements.txt`:
+
+```
+google-genai
+pillow
+python-dotenv
+chromadb
+sentence-transformers
+```
+
+### 2. Configurar la API key de Gemini
+
+**Opción A — Archivo `.env`** (recomendada):
+```
+GEMINI_API_KEY=tu_clave_aqui
+```
+
+**Opción B — Archivo `Apikey.txt`** en la raíz del proyecto:
+```
+AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+```
+
+> **Importante:** Nunca subas la API key al repositorio. Añade `Apikey.txt` y `.env` al `.gitignore`.
+
+### 3. Obtener la API key
+
+1. Ve a https://aistudio.google.com
+2. Inicia sesión con una cuenta Google
+3. Haz clic en **Get API Key** → **Create API key**
+4. Copia la clave (empieza con `AIza`, 39 caracteres)
+
+---
+
+## Componentes
+
+### Componente 1: Shelf Inspector (`src/shelf_inspector.py`)
+
+Analiza imágenes de estantes usando **Google Gemini 2.5 Flash** y produce un JSON estructurado con los problemas detectados.
+
+#### Modelo utilizado
+
+Se utiliza `gemini-2.5-flash`. Durante el desarrollo se probaron otros modelos:
+
+| Modelo | Resultado | Motivo del descarte |
+|---|---|---|
+| `gemini-2.0-flash` | Error 429 persistente | Límite de tasa muy restrictivo en free tier |
+| `gemini-1.5-flash` | Error 404 | No disponible en la versión v1beta de la API |
+| `gemini-2.5-flash` | Funciona | Disponible, multimodal, gratuito con AI Studio |
+
+#### Tres estrategias de prompting
+
+Los prompts están versionados en la carpeta `prompts/` y se cargan desde disco en tiempo de ejecución, nunca hardcodeados en el código.
+
+**Estrategia A — Zero-shot directo** (`inspect_A_zero_shot.txt`):
+Instrucción directa pidiendo el análisis y el JSON, sin ejemplos ni estructura de razonamiento guiada.
+
+**Estrategia B — Chain-of-Thought visual** (`inspect_B_chain_of_thought.txt`):
+El modelo razona explícitamente en 6 pasos: descripción general → análisis zona a zona → identificación de anomalías → estimación de fill rate → clasificación global → producción del JSON. Es la estrategia por defecto.
+
+**Estrategia C — Few-shot con ejemplos textuales** (`inspect_C_few_shot.txt` + `inspect_C_few_shot_examples.txt`):
+Incluye 3 ejemplos textuales de inspecciones correctas antes de la imagen nueva, evitando el consumo extra de quota que implicaría pasar múltiples imágenes.
+
+#### Gestión de quota (API gratuita: 15 req/min, 1500 req/día)
+
+- **Cache por MD5**: cada inspección se guarda en `cache/` identificada por el hash MD5 de la imagen y la estrategia. Si la imagen no cambió, no se consume quota.
+- **Rate limiting**: control de ventana deslizante de 60 segundos para no superar 15 req/min.
+- **Backoff exponencial**: ante error 429, espera 2, 4, 8, 16, 32 segundos entre reintentos.
+- **Fallback gracioso**: si la quota diaria se agota, el sistema sigue funcionando para imágenes en caché y notifica claramente cuando no puede procesar nuevas imágenes.
+
+#### Schema de salida (obligatorio)
+
+```json
+{
+  "inspection_id": "INS_20250317_143022_001",
+  "timestamp": "2025-03-17T14:30:22Z",
+  "image_path": "path/to/image.jpg",
+  "zone_id": "Z_S3",
+  "overall_status": "ok|warning|critical",
+  "issues": [
+    {
+      "issue_id": "ISS_001",
+      "type": "empty_shelf|wrong_product|damaged|misaligned|label_missing|other",
+      "location": "descripción de la ubicación",
+      "severity": "low|medium|high",
+      "description": "descripción en lenguaje natural",
+      "confidence": 0.0,
+      "affected_area_pct": 0.0
+    }
+  ],
+  "shelf_fill_rate": 0.0,
+  "products_detected": ["categorías de producto visibles"],
+  "model_reasoning": "razonamiento explícito antes de la clasificación"
+}
+```
+
+---
+
+## Uso
+
+### Inspección individual
+
+```bash
+cd src/
+python shelf_inspector.py "..\data\images\image.jpg" --zone Z_S1 --strategy B
+```
+
+### Comparar las tres estrategias
+
+```bash
+python shelf_inspector.py "..\data\images\image.jpg" --zone Z_S1 --compare
+```
+
+### Inspección en lote
+
+```python
+from shelf_inspector import ShelfInspector, PromptStrategy
+
+inspector = ShelfInspector()
+results = inspector.inspect_batch(
+    images_dir="../data/images/normal/",
+    zone_id="Z_S1",
+    strategy=PromptStrategy.CHAIN_OF_THOUGHT
+)
+```
+
+### Opciones CLI
+
+```
+positional arguments:
+  image                 Ruta a la imagen del estante
+
+options:
+  --zone ZONE           ID de la zona (default: Z_S1)
+  --strategy {A,B,C}    A=Zero-shot  B=Chain-of-Thought  C=Few-shot (default: B)
+  --compare             Comparar las tres estrategias sobre la misma imagen
+  --force               Ignorar caché y forzar nueva llamada a la API
+  --output OUTPUT       Guardar resultado en archivo JSON
+```
+
+---
+
+## Evaluación
+
+```bash
+python evaluate.py --images-dir test_images/ --output evaluation_report.json
+```
+
+### Métricas implementadas
+
+**Análisis visual:**
+- Issue Detection Rate (recall)
+- False Positive Rate
+- Severity Accuracy
+- JSON Parse Rate
+- Hallucination Rate
+
+**RAG:**
+- Recall@3
+- Faithfulness
+- Answer Relevance (LLM-as-judge)
+
+**Rule Engine:**
+- Rule Parse Rate
+- Rule Correctness
+- Ambiguity Detection Rate
+
+---
+
+## Decisiones técnicas y problemas encontrados
+
+### SDK de Google Gemini — Migración obligatoria
+
+El paquete `google-generativeai` fue deprecado y ya no recibe actualizaciones. El nuevo SDK es `google-genai` y tiene una API completamente diferente:
+
+```bash
+# Incorrecto (deprecado)
+pip install google-generativeai
+
+# Correcto
+pip install google-genai
+```
+
+Cambios principales en el código:
+
+| Antes (`google-generativeai`) | Ahora (`google-genai`) |
+|---|---|
+| `import google.generativeai as genai` | `from google import genai` |
+| `genai.configure(api_key=...)` | `genai.Client(api_key=...)` |
+| `genai.GenerativeModel(MODEL)` | `client.models.generate_content(model=...)` |
+| `[prompt, image]` como contenido | `[Part.from_bytes(...), Part.from_text(...)]` |
+| `generation_config={"temperature": 0}` | `config=GenerateContentConfig(temperature=0)` |
+
+### Selección del modelo
+
+Durante el desarrollo se probaron tres modelos hasta encontrar el que funciona con la API key gratuita de AI Studio:
+
+1. `gemini-2.0-flash` — producía error 429 persistente desde la primera llamada, incluso con backoff
+2. `gemini-1.5-flash` — error 404, el modelo ya no está disponible en la versión `v1beta` de la API
+3. `gemini-2.5-flash` — funciona correctamente, disponible en la lista de modelos de la cuenta
+
+Para verificar los modelos disponibles en tu cuenta:
+```
+https://generativelanguage.googleapis.com/v1beta/models?key=TU_API_KEY
+```
+
+### Carga de la API key en Windows
+
+En Windows, los archivos `.txt` pueden incluir un BOM (Byte Order Mark) invisible al inicio que corrompe la clave. Para leerla correctamente:
+
+```python
+key = Path("Apikey.txt").read_text(encoding="utf-8-sig").strip().replace('\r', '').replace('\n', '')
+```
+
+El encoding `utf-8-sig` elimina automáticamente el BOM. El `.strip()` y el reemplazo de `\r\n` eliminan cualquier salto de línea de Windows.
+
+### Prompts separados del código
+
+Los prompts están en `prompts/*.txt` y se cargan en runtime, no están hardcodeados en el código Python. Esto permite modificar los prompts sin tocar el código y cumple el requisito explícito del enunciado de versionar los prompts separadamente.
+
+La función `load_prompt()` carga el archivo correspondiente a la estrategia, inyecta las variables `{image_path}`, `{zone_id}` y, para la estrategia C, también inyecta el contenido de `inspect_C_few_shot_examples.txt` en `{few_shot_examples}`.
