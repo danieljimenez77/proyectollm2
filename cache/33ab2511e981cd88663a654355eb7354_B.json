@@ -1,0 +1,51 @@
+{
+  "inspection_id": "INS_20231027_103515_789",
+  "timestamp": "2023-10-27T10:35:15Z",
+  "image_path": "..\\data\\images\\image.jpg",
+  "zone_id": "Z_S1",
+  "overall_status": "warning",
+  "issues": [
+    {
+      "issue_id": "ISS_001",
+      "type": "misaligned",
+      "location": "Quinto nivel del estante (packs de Monster)",
+      "severity": "medium",
+      "description": "Los packs de bebidas energéticas no están uniformemente alineados en el borde frontal del estante, muchos están empujados hacia atrás o ligeramente rotados.",
+      "confidence": 0.9,
+      "affected_area_pct": 80.0
+    },
+    {
+      "issue_id": "ISS_002",
+      "type": "misaligned",
+      "location": "Sexto nivel del estante (packs de Monster)",
+      "severity": "medium",
+      "description": "Los packs de bebidas energéticas no están uniformemente alineados en el borde frontal del estante, muchos están empujados hacia atrás o ligeramente rotados.",
+      "confidence": 0.9,
+      "affected_area_pct": 80.0
+    },
+    {
+      "issue_id": "ISS_003",
+      "type": "empty_shelf",
+      "location": "Extremo izquierdo del quinto nivel del estante",
+      "severity": "low",
+      "description": "Pequeño espacio vacío en el extremo izquierdo del estante.",
+      "confidence": 0.8,
+      "affected_area_pct": 5.0
+    },
+    {
+      "issue_id": "ISS_004",
+      "type": "empty_shelf",
+      "location": "Extremo izquierdo del sexto nivel del estante",
+      "severity": "low",
+      "description": "Pequeño espacio vacío en el extremo izquierdo del estante.",
+      "confidence": 0.8,
+      "affected_area_pct": 5.0
+    }
+  ],
+  "shelf_fill_rate": 92.0,
+  "products_detected": [
+    "Energy Drinks",
+    "Canned Beverages"
+  ],
+  "model_reasoning": "El estante muestra varias bebidas energéticas y enlatadas en seis niveles. Las cuatro estanterías superiores están bien surtidas y organizadas. Sin embargo, las dos estanterías inferiores, que exhiben principalmente packs de Monster, muestran una desalineación significativa y algunos pequeños espacios vacíos. Los productos en estas estanterías están empujados hacia atrás o torcidos, lo que lleva a una presentación desordenada. La tasa de llenado general se estima en un 92%, pero los problemas de presentación en las estanterías inferiores justifican un estado de 'warning'."
+}

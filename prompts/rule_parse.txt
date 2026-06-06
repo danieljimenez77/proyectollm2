@@ -1,0 +1,57 @@
+Eres un sistema experto en gestión de tiendas de supermercado.
+Tu tarea es convertir una regla escrita en lenguaje natural por un gestor de tienda
+en una configuración JSON estructurada y ejecutable.
+
+REGLA EN LENGUAJE NATURAL:
+{natural_language}
+
+ZONAS DISPONIBLES EN LA TIENDA:
+{available_zones}
+
+Analiza la regla siguiendo estos pasos:
+
+PASO 1 — COMPRENSIÓN:
+¿Qué condición describe la regla? ¿Qué acción debe tomarse?
+
+PASO 2 — EXTRACCIÓN DE CONDICIONES:
+Identifica: zona(s) afectada(s), horario, tipo de issue, umbral de fill rate, severidad, ubicación en el estante.
+
+PASO 3 — DETECCIÓN DE AMBIGÜEDADES:
+Lista TODOS los aspectos que no están claramente definidos. Por ejemplo:
+- "vazia" → ¿0% o por debajo de un umbral? ¿cuál?
+- Sin zona específica → ¿todas las zonas?
+- Sin horario → ¿cualquier hora?
+- Sin nivel de urgencia → ¿qué alert_level asignar?
+
+PASO 4 — PRODUCE EL JSON:
+Produce ÚNICAMENTE el JSON final con este schema exacto, sin texto adicional después:
+
+{
+  "rule_id": "{rule_id}",
+  "created_at": "{created_at}",
+  "natural_language": "{natural_language}",
+  "description": "<reformulación clara y formal de la regla>",
+  "conditions": {
+    "zone_filter": ["<zonas o null para todas>"],
+    "time_filter": {"hours_start": <int o null>, "hours_end": <int o null>},
+    "issue_types": ["<empty_shelf|wrong_product|damaged|misaligned|label_missing|other>"],
+    "severity_threshold": "<low|medium|high|any>",
+    "fill_rate_threshold": <float 0.0-1.0 o null>,
+    "location_filter": "<bottom|middle|top|any>"
+  },
+  "action": {
+    "alert_level": "<info|warning|critical>",
+    "notification_message": "<template del mensaje cuando la regla se activa, usando {zone_id}, {fill_rate}, {issue_type}, {severity}>"
+  },
+  "validation": {
+    "is_valid": <true|false>,
+    "ambiguities": ["<lista de aspectos no claros — vacía [] si no hay>"],
+    "assumptions": ["<lista de suposiciones asumidas en la conversión>"]
+  }
+}
+
+IMPORTANTE:
+- Si hay ambigüedades, igualmente produce el JSON con los valores más razonables,
+  pero lista las ambigüedades en validation.ambiguities.
+- Si la regla es completamente ininteligible, pon is_valid: false.
+- El campo notification_message debe ser un template con variables entre llaves.

@@ -1,7 +1,7 @@
 # Retail Vision Intelligence System — TP2
 
 **LIACD — Interação com Modelos de Grande Escala**  
-Año lectivo 2025/2026
+Año lectivo 2025/2026 | Cotación: 6,5 / 20
 
 ---
 
@@ -40,7 +40,7 @@ Sistema de inspección visual continua de estantes de supermercado con memoria. 
 tp2 integracion/
 ├── README.md
 ├── requirements.txt
-├── Apikey.txt
+├── Apikey.txt                        ← API key de Gemini (NO subir al repositorio)
 ├── .gitignore
 │
 ├── data/
@@ -142,7 +142,7 @@ GEMINI_API_KEY=tu_clave_aqui
 AIzaSyXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
 ```
 
-> **Importante:** Nunca subas la API key al repositorio. Añade `Apikey.txt` y `.env` al `.gitignore`.
+> ⚠️ **Importante:** Nunca subas la API key al repositorio. Añade `Apikey.txt` y `.env` al `.gitignore`.
 
 ### 3. Obtener la API key
 
@@ -167,7 +167,7 @@ Se utiliza `gemini-2.5-flash`. Durante el desarrollo se probaron otros modelos:
 |---|---|---|
 | `gemini-2.0-flash` | Error 429 persistente | Límite de tasa muy restrictivo en free tier |
 | `gemini-1.5-flash` | Error 404 | No disponible en la versión v1beta de la API |
-| `gemini-2.5-flash` | Funciona | Disponible, multimodal, gratuito con AI Studio |
+| `gemini-2.5-flash` | ✅ Funciona | Disponible, multimodal, gratuito con AI Studio |
 
 #### Tres estrategias de prompting
 
@@ -217,46 +217,118 @@ Incluye 3 ejemplos textuales de inspecciones correctas antes de la imagen nueva,
 
 ---
 
+### Componente 2: Rule Engine (`src/rule_engine.py`)
+
+Convierte reglas en lenguaje natural definidas por el gestor en configuraciones JSON ejecutables, y las ejecuta contra los resultados de inspecciones.
+
+#### Prompts del Rule Engine
+
+| Archivo | Propósito |
+|---|---|
+| `prompts/rule_parse.txt` | Convierte lenguaje natural a JSON en 4 pasos guiados |
+| `prompts/rule_ambiguity_response.txt` | Genera respuesta amigable al gestor cuando hay ambigüedades |
+
+#### Flujo de conversión
+
+El prompt `rule_parse.txt` guía al modelo en 4 pasos:
+1. **Comprensión** — qué condición describe la regla y qué acción debe tomarse
+2. **Extracción** — zona(s), horario, tipo de issue, umbral de fill rate, severidad, ubicación
+3. **Detección de ambigüedades** — lista todos los aspectos no claramente definidos
+4. **Producción del JSON** — genera el schema estructurado con el campo `validation`
+
+#### Schema de regla
+
+```json
+{
+  "rule_id": "RULE_001",
+  "created_at": "2026-06-06T15:20:03Z",
+  "natural_language": "texto original del gestor",
+  "description": "reformulación clara en lenguaje formal",
+  "conditions": {
+    "zone_filter": ["Z_S1", "Z_S3"],
+    "time_filter": {"hours_start": 10, "hours_end": 13},
+    "issue_types": ["empty_shelf", "misaligned"],
+    "severity_threshold": "low|medium|high|any",
+    "fill_rate_threshold": 0.6,
+    "location_filter": "bottom|middle|top|any"
+  },
+  "action": {
+    "alert_level": "info|warning|critical",
+    "notification_message": "template con {zone_id}, {fill_rate}, {issue_type}, {severity}"
+  },
+  "validation": {
+    "is_valid": true,
+    "ambiguities": ["lista de aspectos no claros"],
+    "assumptions": ["lista de suposiciones asumidas"]
+  }
+}
+```
+
+#### Ejecución de reglas
+
+Tras cada inspección, el executor recorre todas las reglas guardadas verificando en orden:
+- Filtro de zona — ¿la zona inspeccionada está en `zone_filter`?
+- Filtro de horario — ¿la hora del timestamp está dentro de `time_filter`?
+- Filtro de fill rate — ¿el `shelf_fill_rate` está por debajo del umbral?
+- Filtro de issues — ¿algún issue coincide con `issue_types`, `severity_threshold` y `location_filter`?
+
+Cada ejecución produce logs detallados indicando qué reglas se verificaron, cuáles se activaron y por qué.
+
+#### Comportamiento con ambigüedades
+
+Cuando una regla tiene ambigüedades, el sistema **no asume silenciosamente**: genera una respuesta en lenguaje natural explicando cada ambigüedad y preguntando cómo resolverla. La regla solo se guarda si el gestor usa `--auto-save` o confirma explícitamente.
+
+Ejemplo real durante el desarrollo — regla: `"Avísame cuando el fill rate de cualquier zona caiga por debajo del 60%"`
+
+Ambigüedades detectadas automáticamente:
+- No se especifica horario → asume cualquier momento
+- No se especifica nivel de urgencia → asume `warning`
+- Fill rate es una métrica, no un `issue_type` → `issue_types` queda vacío
+- No se especifica severidad → asume `any`
+- No se especifica ubicación en el estante → asume `any`
+
+
+---
+
 ## Uso
 
-### Inspección individual
+### Shelf Inspector
 
 ```bash
 cd src/
+
+# Inspección individual con Chain-of-Thought (por defecto)
 python shelf_inspector.py "..\data\images\image.jpg" --zone Z_S1 --strategy B
+
+# Comparar las tres estrategias sobre la misma imagen
+python shelf_inspector.py "..\data\images\image.jpg" --zone Z_S1 --compare
+
+# Forzar nueva llamada ignorando caché
+python shelf_inspector.py "..\data\images\image.jpg" --force
 ```
 
-### Comparar las tres estrategias
+### Rule Engine
 
 ```bash
-python shelf_inspector.py "..\data\images\image.jpg" --zone Z_S1 --compare
-```
+cd src/
 
-### Inspección en lote
+# Añadir una regla (pregunta si hay ambigüedades)
+python rule_engine.py add "Avísame cuando la prateleira inferior esté más de 40% vacía"
 
-```python
-from shelf_inspector import ShelfInspector, PromptStrategy
+# Añadir guardando aunque haya ambigüedades
+python rule_engine.py add "Avisa cuando haya productos desalineados" --auto-save
 
-inspector = ShelfInspector()
-results = inspector.inspect_batch(
-    images_dir="../data/images/normal/",
-    zone_id="Z_S1",
-    strategy=PromptStrategy.CHAIN_OF_THOUGHT
-)
-```
+# Listar todas las reglas guardadas
+python rule_engine.py list
 
-### Opciones CLI
+# Eliminar una regla
+python rule_engine.py delete RULE_001
 
-```
-positional arguments:
-  image                 Ruta a la imagen del estante
+# Probar una regla contra una inspección
+python rule_engine.py test RULE_001 --inspection "..\cache\resultado.json"
 
-options:
-  --zone ZONE           ID de la zona (default: Z_S1)
-  --strategy {A,B,C}    A=Zero-shot  B=Chain-of-Thought  C=Few-shot (default: B)
-  --compare             Comparar las tres estrategias sobre la misma imagen
-  --force               Ignorar caché y forzar nueva llamada a la API
-  --output OUTPUT       Guardar resultado en archivo JSON
+# Ejecutar todas las reglas contra una inspección
+python rule_engine.py execute --inspection "..\cache\resultado.json"
 ```
 
 ---
@@ -316,9 +388,9 @@ Cambios principales en el código:
 
 Durante el desarrollo se probaron tres modelos hasta encontrar el que funciona con la API key gratuita de AI Studio:
 
-1. `gemini-2.0-flash` — producía error 429 persistente desde la primera llamada, incluso con backoff
-2. `gemini-1.5-flash` — error 404, el modelo ya no está disponible en la versión `v1beta` de la API
-3. `gemini-2.5-flash` — funciona correctamente, disponible en la lista de modelos de la cuenta
+1. `gemini-2.0-flash` — error 429 persistente desde la primera llamada, incluso con backoff
+2. `gemini-1.5-flash` — error 404, modelo no disponible en la versión `v1beta` de la API
+3. `gemini-2.5-flash` — ✅ funciona correctamente con la key gratuita de AI Studio
 
 Para verificar los modelos disponibles en tu cuenta:
 ```
@@ -335,8 +407,27 @@ key = Path("Apikey.txt").read_text(encoding="utf-8-sig").strip().replace('\r', '
 
 El encoding `utf-8-sig` elimina automáticamente el BOM. El `.strip()` y el reemplazo de `\r\n` eliminan cualquier salto de línea de Windows.
 
+### API key subida accidentalmente a GitHub
+
+Durante el primer commit se incluyó `Apikey.txt` en el repositorio porque el `.gitignore` se creó después de `git add .`. Para eliminarlo del historial de Git sin borrar el archivo local:
+
+```bash
+git rm --cached Apikey.txt
+git rm --cached -r cache/
+git commit -m "fix: eliminar Apikey.txt y cache del repositorio"
+```
+
 ### Prompts separados del código
 
-Los prompts están en `prompts/*.txt` y se cargan en runtime, no están hardcodeados en el código Python. Esto permite modificar los prompts sin tocar el código y cumple el requisito explícito del enunciado de versionar los prompts separadamente.
+Los prompts están en `prompts/*.txt` y se cargan en runtime. Esto permite modificar los prompts sin tocar el código Python y cumple el requisito explícito del enunciado de versionar los prompts separadamente.
 
-La función `load_prompt()` carga el archivo correspondiente a la estrategia, inyecta las variables `{image_path}`, `{zone_id}` y, para la estrategia C, también inyecta el contenido de `inspect_C_few_shot_examples.txt` en `{few_shot_examples}`.
+Archivos de prompts actuales:
+
+| Archivo | Componente | Propósito |
+|---|---|---|
+| `inspect_A_zero_shot.txt` | Shelf Inspector | Estrategia A — Zero-shot |
+| `inspect_B_chain_of_thought.txt` | Shelf Inspector | Estrategia B — Chain-of-Thought |
+| `inspect_C_few_shot.txt` | Shelf Inspector | Estrategia C — Few-shot (plantilla) |
+| `inspect_C_few_shot_examples.txt` | Shelf Inspector | Ejemplos para estrategia C |
+| `rule_parse.txt` | Rule Engine | Conversión de lenguaje natural a JSON |
+| `rule_ambiguity_response.txt` | Rule Engine | Respuesta al gestor sobre ambigüedades |

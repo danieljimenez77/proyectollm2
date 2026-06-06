@@ -1,0 +1,47 @@
+{
+  "rule_id": "RULE_001",
+  "created_at": "2024-07-30T10:00:00.000000+00:00",
+  "natural_language": "Avísame cuando haya productos desalineados en cualquier zona",
+  "description": "Notificar cuando se detecten productos desalineados en cualquiera de las zonas de la tienda (Z_S1, Z_S2, Z_S3, Z_S4, Z_S5).",
+  "conditions": {
+    "zone_filter": [
+      "Z_S1",
+      "Z_S2",
+      "Z_S3",
+      "Z_S4",
+      "Z_S5"
+    ],
+    "time_filter": {
+      "hours_start": null,
+      "hours_end": null
+    },
+    "issue_types": [
+      "misaligned"
+    ],
+    "severity_threshold": "any",
+    "fill_rate_threshold": null,
+    "location_filter": "any"
+  },
+  "action": {
+    "alert_level": "warning",
+    "notification_message": "Alerta: Productos desalineados detectados en la zona {zone_id}. Por favor, revisar."
+  },
+  "validation": {
+    "is_valid": true,
+    "ambiguities": [
+      "No se especifica el horario de aplicación de la regla.",
+      "No se especifica el nivel de alerta (info, warning, critical) para la notificación.",
+      "No se especifica un umbral de cantidad o porcentaje de productos desalineados para activar la alerta.",
+      "No se especifica la severidad del problema de desalineación (low, medium, high).",
+      "No se especifica la ubicación en el estante (bottom, middle, top)."
+    ],
+    "assumptions": [
+      "La regla debe aplicarse en cualquier momento del día.",
+      "El nivel de alerta por defecto para 'Avísame' es 'warning'.",
+      "La alerta se activa con la detección de cualquier producto desalineado, sin un umbral de cantidad.",
+      "La regla aplica a cualquier nivel de severidad de desalineación.",
+      "La regla aplica a cualquier ubicación en el estante.",
+      "Las zonas 'Z_S1, Z_S2, Z_S3, Z_S4, Z_S5' son las 'cualquier zona' mencionadas."
+    ]
+  }
+}
