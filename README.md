@@ -514,3 +514,90 @@ python rag_memory.py query "¿Dónde hay productos desalineados?" --issues
 Durante las pruebas iniciales se obtuvo un `503 UNAVAILABLE` al llamar a Gemini para sintetizar la respuesta RAG. Es un error temporal por alta demanda. La solución es esperar unos minutos y reintentar. El código de producción debería incluir retry con backoff para este caso (igual que el 429 en `shelf_inspector.py`).
 
 La recuperación semántica (embeddings + ChromaDB) funciona correctamente de forma independiente — el error solo afecta a la síntesis final por Gemini.
+
+---
+
+### Componente 5: Interface (`src/interface.py`)
+
+Interfaz conversacional CLI que orquesta todos los componentes anteriores. Mantiene estado de sesión entre comandos y presenta errores de forma amigable sin exponer stack traces.
+
+#### Modos de operación
+
+```
+retail> inspect <imagen> [--zone Z_S1] [--strategy A|B|C]
+retail> inspect --dir <carpeta> [--zone Z_S1]
+
+retail> add rule "<regla en lenguaje natural>"
+retail> add rule "<regla>" --save
+retail> list rules
+retail> delete rule <RULE_ID>
+retail> test rule <RULE_ID> --last
+
+retail> history "<pregunta>"
+retail> history "<pregunta>" --zone Z_S1
+retail> history "<pregunta>" --issues
+
+retail> report --last
+retail> report --session <SESSION_ID>
+retail> report --json <ruta.json>
+
+retail> status
+retail> help
+retail> exit
+```
+
+#### Estado de sesión
+
+Al iniciar, la interfaz muestra el estado del sistema:
+- Sesión activa (ID generado automáticamente)
+- Número de reglas cargadas desde `data/rules/`
+- Summaries e issues indexados en el RAG
+- Inspecciones realizadas en la sesión actual
+
+Tras cada `inspect`, el sistema automáticamente ejecuta las reglas guardadas y notifica si alguna se activa, sin necesidad de comandos adicionales.
+
+#### Comportamiento verificado en pruebas
+
+```
+retail> inspect ..\data\images\image.jpg --zone Z_S1
+⚠️ Z_S1 — Status: warning | Fill rate: 92.0%
+Issues detectados (4):
+  🟠 misaligned — Quinto nivel del estante (packs de Monster)
+  🟠 misaligned — Sexto nivel del estante (packs de Monster)
+  🟡 empty_shelf — Extremo izquierdo del quinto nivel
+  🟡 empty_shelf — Extremo izquierdo del sexto nivel
+🔔 1 regla(s) activada(s):
+  ⚠️ [RULE_001] Alerta: Productos desalineados detectados en Z_S1.
+```
+
+---
+
+## Problema recurrente: Apikey.txt en commits de Git
+
+Durante el desarrollo este problema ocurrió varias veces. La causa es siempre la misma: el archivo `Apikey.txt` se crea después de haber inicializado el repositorio y Git lo detecta como archivo nuevo en el siguiente `git add .`.
+
+**Solución cuando el archivo está en el último commit pero aún no se hizo push:**
+```bash
+git rm --cached Apikey.txt
+git commit --amend --no-edit
+git push
+```
+
+**Solución cuando ya está en el historial y GitHub bloquea el push:**
+```bash
+git filter-branch --force --index-filter "git rm --cached --ignore-unmatch Apikey.txt" --prune-empty --tag-name-filter cat -- --all
+git push origin main --force
+```
+
+**Importante:** Si la key llegó a subirse a un repositorio público, hay que generarla nueva inmediatamente en [aistudio.google.com](https://aistudio.google.com) ya que quedó comprometida.
+
+**Prevención definitiva** — verificar que `.gitignore` contiene:
+```
+Apikey.txt
+.env
+cache/
+vectorstore/
+__pycache__/
+*.pyc
+data/inspections/
+```
