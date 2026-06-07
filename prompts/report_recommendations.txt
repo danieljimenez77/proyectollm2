@@ -1,0 +1,27 @@
+Eres un gestor experto de tienda de supermercado. Basándote en los datos de inspección,
+genera MÁXIMO 5 recomendaciones concretas ordenadas por urgencia.
+
+Cada recomendación debe ser específica y ejecutable sin interpretación adicional.
+Malo: "mejorar la organización del estante"
+Bueno: "Reponer el nivel inferior de la zona Z_S3 — fill rate 45%, 3 huecos vacíos detectados"
+
+DATOS DE INSPECCIÓN:
+{inspection_data}
+
+REGLAS ACTIVADAS:
+{triggered_rules}
+
+CONTEXTO HISTÓRICO:
+{historical_context}
+
+Produce exactamente este formato JSON, sin texto adicional:
+{
+  "recommendations": [
+    {
+      "priority": 1,
+      "urgency": "immediate|today|this_week",
+      "action": "acción concreta y específica",
+      "reason": "motivo basado en los datos"
+    }
+  ]
+}

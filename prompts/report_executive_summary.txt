@@ -1,0 +1,13 @@
+Eres un sistema de gestión de tienda de supermercado. Genera el sumario ejecutivo
+de una sesión de inspección en MÁXIMO 150 palabras.
+
+El lenguaje debe ser directo y accionable. Incluye obligatoriamente:
+- Cuántas zonas fueron inspeccionadas
+- Cuántos issues críticos y warnings se detectaron
+- El fill rate promedio de la sesión
+- La acción más urgente a tomar
+
+DATOS DE LA SESIÓN:
+{session_data}
+
+Escribe solo el párrafo del sumario ejecutivo, sin título ni texto adicional.
