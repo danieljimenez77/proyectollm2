@@ -1,0 +1,20 @@
+Eres un sistema de gestión de tienda de supermercado. Tu tarea es generar un resumen
+semánticamente rico de una inspección de estante para indexarlo en una base de datos vectorial.
+
+El resumen debe ser denso en términos relevantes para búsqueda futura: zona, hora, día de la semana,
+tipo de productos, tipo de problemas, severidad, fill rate. Evita frases genéricas como
+"hay problemas en el estante". Sé específico y concreto.
+
+DATOS DE LA INSPECCIÓN:
+{inspection_json}
+
+Genera UN ÚNICO párrafo de 3-5 líneas en español que resuma esta inspección de forma rica
+y recuperable. No uses listas ni bullet points. Solo el párrafo, sin texto adicional antes ni después.
+
+EJEMPLO DE BUEN RESUMEN:
+"Inspección de la zona Z_S3 el martes a las 15h detectó fill rate del 72%, con producto de limpieza
+(detergente líquido) fuera de posición en la sección central del nivel medio, y embalaje dañado
+en el lado derecho del nivel inferior. Estado crítico con 2 issues de severidad alta."
+
+EJEMPLO DE MAL RESUMEN:
+"La inspección encontró problemas en el estante. Hay algunos productos mal colocados."

@@ -307,6 +307,29 @@ python shelf_inspector.py "..\data\images\image.jpg" --zone Z_S1 --compare
 python shelf_inspector.py "..\data\images\image.jpg" --force
 ```
 
+### RAG Memory
+
+```bash
+cd src/
+
+# Indexar una inspección
+python rag_memory.py index "..\cacheesultado.json"
+
+# Indexar todas las inspecciones de un directorio
+python rag_memory.py index-dir "..\data\inspections"
+
+# Consultas en lenguaje natural
+python rag_memory.py query "¿Cuándo fue la última vez que Z_S1 tuvo problemas?"
+python rag_memory.py query "¿Hay productos desalineados?" --zone Z_S1
+python rag_memory.py query "¿Dónde hay issues de fill rate bajo?" --issues --k 5
+
+# Ver estadísticas del vector store
+python rag_memory.py stats
+
+# Limpiar vector store (irreversible)
+python rag_memory.py reset
+```
+
 ### Rule Engine
 
 ```bash
@@ -431,3 +454,63 @@ Archivos de prompts actuales:
 | `inspect_C_few_shot_examples.txt` | Shelf Inspector | Ejemplos para estrategia C |
 | `rule_parse.txt` | Rule Engine | Conversión de lenguaje natural a JSON |
 | `rule_ambiguity_response.txt` | Rule Engine | Respuesta al gestor sobre ambigüedades |
+| `rag_summary.txt` | RAG Memory | Generación de summaries ricos para indexación |
+| `rag_query.txt` | RAG Memory | Síntesis de respuesta con contexto recuperado |
+
+---
+
+### Componente 3: RAG Memory (`src/rag_memory.py`)
+
+Indexa el historial de inspecciones en una base de datos vectorial y permite recuperación semántica en lenguaje natural.
+
+#### Stack tecnológico
+
+| Componente | Tecnología | Justificación |
+|---|---|---|
+| Embeddings | `paraphrase-multilingual-MiniLM-L12-v2` | Local, gratuito, soporta español y portugués |
+| Vector store | ChromaDB (PersistentClient) | Local, persistente en disco, sin servidor |
+| Similaridad | Coseno (hnsw:space=cosine) | Estándar para similitud semántica de texto |
+| Síntesis | Gemini 2.5 Flash | Genera respuestas en lenguaje natural con contexto recuperado |
+
+#### Estrategia de chunking híbrida
+
+Se implementan dos colecciones en ChromaDB:
+
+**`inspection_summaries`** — un chunk por inspección:
+- El texto indexado es un summary generado por Gemini, semánticamente rico
+- Los metadatos estructurados (zona, fecha, hora, día de semana, fill rate, status) permiten filtrado pre-retrieval
+- Recuperación eficiente para queries generales
+
+**`inspection_issues`** — un chunk por issue individual:
+- Cada issue se indexa con texto detallado: tipo, ubicación, descripción, severidad, confianza
+- Permite recuperación granular para queries específicas ("¿dónde hay productos misaligned?")
+- Aumenta el índice pero mejora el Recall@3 para queries de issue específico
+
+#### Prompts del RAG
+
+| Archivo | Propósito |
+|---|---|
+| `prompts/rag_summary.txt` | Genera summaries ricos para indexación |
+| `prompts/rag_query.txt` | Sintetiza respuesta con contexto recuperado |
+
+El prompt `rag_summary.txt` incluye ejemplos explícitos de buen y mal summary para guiar al modelo:
+- **Malo:** "hay problemas en el estante"
+- **Bueno:** "zona Z_S3, martes 15h, fill rate 72%, detergente líquido fuera de posición en nivel medio, embalaje dañado en nivel inferior"
+
+#### Queries obligatorias soportadas
+
+```bash
+python rag_memory.py query "¿Cuándo fue la última vez que la zona Z_S1 tuvo problemas?"
+python rag_memory.py query "¿Qué zonas tuvieron más issues esta semana?"
+python rag_memory.py query "¿Existe algún patrón en los problemas detectados los viernes?"
+python rag_memory.py query "¿Qué reglas se activaron más este mes?"
+python rag_memory.py query "¿Qué problemas se detectaron en Z_S1?" --zone Z_S1
+python rag_memory.py query "¿Dónde hay productos desalineados?" --issues
+```
+
+#### Problemas encontrados
+
+**Error 503 — Alta demanda del servidor Gemini:**
+Durante las pruebas iniciales se obtuvo un `503 UNAVAILABLE` al llamar a Gemini para sintetizar la respuesta RAG. Es un error temporal por alta demanda. La solución es esperar unos minutos y reintentar. El código de producción debería incluir retry con backoff para este caso (igual que el 429 en `shelf_inspector.py`).
+
+La recuperación semántica (embeddings + ChromaDB) funciona correctamente de forma independiente — el error solo afecta a la síntesis final por Gemini.
