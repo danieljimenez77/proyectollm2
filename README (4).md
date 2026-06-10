@@ -601,3 +601,149 @@ __pycache__/
 *.pyc
 data/inspections/
 ```
+
+---
+
+### Componente 5 (Streamlit): Interface Visual (`src/interface_streamlit.py`)
+
+Interface visual completa construída com Streamlit, substituindo a CLI por uma experiência mais intuitiva com pestañas, botões e visualização de imagens.
+
+#### Iniciar a interface
+
+```bash
+cd src/
+streamlit run interface_streamlit.py
+```
+
+Abre automaticamente em `http://localhost:8501`.
+
+#### Pestañas disponíveis
+
+**📸 Inspeção** — Upload de imagem, seleção de zona e estratégia de prompting, visualização dos issues com código de cores (🔴 alto, 🟠 médio, 🟡 baixo), raciocínio do modelo e regras ativadas automaticamente.
+
+**📋 Regras** — Criação de regras em linguagem natural com deteção de ambiguidades, listagem com botão de eliminação, e visualização do JSON gerado.
+
+**🔍 Histórico** — Consultas RAG com botões de queries frequentes, filtro por zona, modo de pesquisa granular por issue, e documentos recuperados com score de similaridade.
+
+**📄 Relatórios** — Geração de relatórios da sessão atual ou a partir de JSON existente, seletor de relatórios anteriores, visualização inline e botão de download.
+
+---
+
+## Avaliação (`evaluate.py`)
+
+```bash
+# Avaliação completa
+python evaluate.py --images-dir test_images/ --output evaluation_report.json
+
+# Apenas análise visual
+python evaluate.py --images-dir test_images/ --output eval.json --skip-rag --skip-rules
+
+# Com ground truth manual
+python evaluate.py --images-dir test_images/ --ground-truth ground_truth.json --output eval.json
+```
+
+### Ground Truth
+
+O harness aceita um ficheiro JSON de anotações manuais (`--ground-truth`). Se não for fornecido, o sistema infere o ground truth automaticamente a partir dos nomes dos ficheiros de imagem:
+
+| Nome contém | Status inferido | Issue type |
+|---|---|---|
+| `empty`, `vaci` | critical | empty_shelf |
+| `misalign`, `desalin` | warning | misaligned |
+| `damage`, `dan` | warning | damaged |
+| `wrong`, `plano` | warning | wrong_product |
+| `ok`, `normal`, `good` | ok | — |
+
+### LLM-as-Judge
+
+O avaliador usa o próprio Gemini 2.5 Flash como juiz para métricas qualitativas:
+
+| Prompt | Métrica avaliada |
+|---|---|
+| `evaluate_hallucination.txt` | Se as afirmações em `description` são verificáveis |
+| `evaluate_rag_judge.txt` | Faithfulness e Answer Relevance das respostas RAG |
+| `evaluate_report_judge.txt` | Completude, acionabilidade e precisão dos relatórios |
+
+---
+
+## Instalação Completa
+
+### 1. Clonar o repositório
+
+```bash
+git clone https://github.com/danieljimenez77/proyectollm2
+cd proyectollm2
+```
+
+### 2. Instalar dependências
+
+```bash
+pip install -r requirements.txt
+```
+
+### 3. Configurar chave de API
+
+Copiar `.env.example` para `.env` e preencher a chave:
+
+```bash
+cp .env.example .env
+# editar .env e adicionar: GEMINI_API_KEY=a_sua_chave
+```
+
+Ou criar `Apikey.txt` na raiz do projeto com apenas a chave na primeira linha.
+
+### 4. Iniciar a interface
+
+```bash
+cd src/
+streamlit run interface_streamlit.py
+```
+
+---
+
+## Estrutura Final do Repositório
+
+```
+tp2 integracion/
+├── README.md
+├── requirements.txt
+├── .env.example
+├── .gitignore
+├── evaluate.py
+│
+├── data/
+│   ├── images/
+│   │   ├── normal/
+│   │   ├── empty/
+│   │   ├── planogram/
+│   │   ├── dirty/
+│   │   └── ambiguous/
+│   ├── inspections/
+│   └── rules/
+│
+├── src/
+│   ├── shelf_inspector.py
+│   ├── rule_engine.py
+│   ├── rag_memory.py
+│   ├── report_generator.py
+│   ├── interface.py
+│   └── interface_streamlit.py
+│
+├── prompts/
+│   ├── inspect_A_zero_shot.txt
+│   ├── inspect_B_chain_of_thought.txt
+│   ├── inspect_C_few_shot.txt
+│   ├── inspect_C_few_shot_examples.txt
+│   ├── rule_parse.txt
+│   ├── rule_ambiguity_response.txt
+│   ├── rag_summary.txt
+│   ├── rag_query.txt
+│   ├── report_executive_summary.txt
+│   ├── report_recommendations.txt
+│   ├── evaluate_hallucination.txt
+│   ├── evaluate_rag_judge.txt
+│   └── evaluate_report_judge.txt
+│
+├── vectorstore/          ← gerado em runtime (ChromaDB)
+└── cache/                ← gerado em runtime (cache MD5)
+```

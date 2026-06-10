@@ -1,0 +1,23 @@
+# Retail Vision Intelligence System — TP2
+# Dependências do projeto
+
+# API Google Gemini (novo SDK)
+google-genai
+
+# Processamento de imagens
+pillow
+
+# Variáveis de ambiente
+python-dotenv
+
+# Base de dados vetorial (RAG)
+chromadb
+
+# Embeddings multilingues locais
+sentence-transformers
+
+# Interface visual
+streamlit
+
+# Plotly para gráficos (opcional, usado pelo Streamlit)
+plotly
